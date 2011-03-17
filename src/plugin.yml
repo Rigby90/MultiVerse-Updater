@@ -1,0 +1,13 @@
+name: MultiVerse-Updater
+main: com.onarandombox.MultiVerseUpdater.MultiVerseUpdater
+authors: ['Rigby']
+version: 2.0
+commands:
+  mvupdate:
+    alias: ['update','mvu']
+    description: Command to update MultiVerse and/or its Modules.
+    usage: You did it wrong...
+  mvinstall:
+    alias: ['install','mvi']
+    description: Command to install a new Module/Package
+    usage: You did it wrong again...
