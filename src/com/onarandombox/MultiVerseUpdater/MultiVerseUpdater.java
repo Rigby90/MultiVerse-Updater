@@ -1,6 +1,12 @@
 package com.onarandombox.MultiVerseUpdater;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +34,10 @@ public class MultiVerseUpdater extends JavaPlugin {
     // MultiVerse Modules for the Updater/Installer
     public static HashMap<String,MVModule> modules = new HashMap<String,MVModule>();
     
+    public void onLoad() {
+        // Check if MultiVerse folder exists... if not create it.
+    }
+    
     @Override
     public void onDisable() {
         log.info(logPrefix + "- Disabled");
@@ -36,36 +46,96 @@ public class MultiVerseUpdater extends JavaPlugin {
     @Override
     public void onEnable() {
         log.info(logPrefix + "- Version " + this.getDescription().getVersion() + " Enabled - By " + getAuthors());
-
+        
         setupCommands();
 
         loadUpdaterModules();
     }
 
     /**
-     * onCommand
+     * Download the file from the given URL and save it to the File location.
+     * @param downloadURL -- Remote File to download.
+     * @param file -- Location to save the file to.
+     * @throws Exception
      */
-    public boolean onCommand(CommandSender sender, Command command, String commandLabel, String[] args) {
-        if(this.isEnabled() == false){
-            sender.sendMessage("This plugin is Disabled!");
-            return true;
-        }
+    public void downloadFile(String downloadURL, File file) {
+        // Grab the name of the file from the DownloadURL.
+        String fileName = downloadURL.substring(downloadURL.lastIndexOf('/') + 1);
         
-        MVCommandHandler handler = commands.get(command.getName().toLowerCase());
-            
-        if (handler!=null) {
-            return handler.perform(sender, args);
-        } else {
-            return false;
-        }
-    }
-    
-    private void loadUpdaterModules() {
-        if(!(new File(dataFolder, "modules.yml").exists())){
+        // Simple output to state that the plugin is downloading a file.
+        MultiVerseUpdater.log.info(MultiVerseUpdater.logPrefix + "- Downloading File - " + fileName);
+
+        // Initialize a URL Variable.
+        URL url = null;
+        // Attempt to parse the given downloadURL into a URL we can download from.
+        try { 
+            url = new URL(downloadURL); 
+        } 
+        catch (MalformedURLException e) { 
+            MultiVerseUpdater.log.severe("Error Parsing URL"); 
+            MultiVerseUpdater.log.severe(e.toString());
             return;
         }
         
-        Configuration config = new Configuration(new File(dataFolder, "modules.yml"));
+        // If the file already exists then lets rename it to a backup.
+        if (file.exists()) {
+            file.renameTo(new File(file.toString() + ".backup"));
+            //file.delete();
+        }
+
+        // Initialize an InputStream and OutputStream
+        InputStream inputStream = null;
+        OutputStream outputStream = null;
+        
+        // Attempt to Open the streams ot the URL and to the Local File.
+        try {
+            inputStream = url.openStream();
+            outputStream = new FileOutputStream(file);
+        } catch (IOException e) {
+            MultiVerseUpdater.log.severe("Error Opening Streams");
+            MultiVerseUpdater.log.severe(e.toString());
+            return;
+        }
+        
+        // Attempt to write the InputStream to the OutputStream.
+        try {
+            // Create a byte array for our buffer and limit it to 1024 Bytes.
+            byte[] buffer = new byte[1024];
+            // Initialize an array to hold the current length within the loop/stream.
+            int len = 0;
+            // Loop through the InputStream and write to the output stream.
+            while ((len = inputStream.read(buffer)) > 0) {
+                outputStream.write(buffer, 0, len);
+            }
+        } catch (IOException e) {
+            MultiVerseUpdater.log.severe("Error Reading/Writing Stream");
+            MultiVerseUpdater.log.severe(e.toString());
+            return;
+        }
+        
+        // Attempt to Close both the InputStream and OutputStream
+        try {
+            inputStream.close();
+            outputStream.close();
+        } catch (IOException e) {
+            MultiVerseUpdater.log.severe("Error Closing Streams");
+            MultiVerseUpdater.log.severe(e.toString());
+            return;
+        }
+    }
+    
+    /**
+     * Function to load the modules file into the class.
+     */
+    private void loadUpdaterModules() {
+        File file = new File(dataFolder, "modules.yml");
+        if(!(file.exists())){
+            MultiVerseUpdater.log.info(logPrefix + "- Missing Modules.yml, attempting to download");
+            downloadFile("http://bukkit.onarandombox.com/multiverse/modules.yml", file);
+            if(!(file.exists())){ return; }
+        }
+        
+        Configuration config = new Configuration(file);
         config.load();
         
         MultiVerseUpdater.modules = new HashMap<String,MVModule>();
@@ -86,6 +156,24 @@ public class MultiVerseUpdater extends JavaPlugin {
         
     }
 
+
+    /**
+     * onCommand
+     */
+    public boolean onCommand(CommandSender sender, Command command, String commandLabel, String[] args) {
+        if(this.isEnabled() == false){
+            sender.sendMessage("This plugin is Disabled!");
+            return true;
+        }
+        
+        MVCommandHandler handler = commands.get(command.getName().toLowerCase());
+            
+        if (handler!=null) {
+            return handler.perform(sender, args);
+        } else {
+            return false;
+        }
+    }
     
     /**
      * Setup commands to the Command Handler
